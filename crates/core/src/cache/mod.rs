@@ -1,14 +1,14 @@
-/// All cache related operation are charged by [CacheManager]
-pub struct CacheManager {}
+pub mod module_cache;
 
-impl CacheManager {
-  pub fn new() -> Self {
-    Self {}
-  }
+/// All cache related operation are charged by [CacheManager]
+pub struct CacheManager {
+  module_cache: module_cache::ModuleCacheManager,
 }
 
-impl Default for CacheManager {
-  fn default() -> Self {
-    Self::new()
+impl CacheManager {
+  pub fn new(root: &str) -> Self {
+    Self {
+      module_cache: module_cache::ModuleCacheManager::new(root),
+    }
   }
 }

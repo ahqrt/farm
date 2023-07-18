@@ -3,7 +3,6 @@ use std::any::Any;
 use downcast_rs::{impl_downcast, Downcast};
 use farmfe_macro_cache_item::cache_item;
 use hashbrown::HashSet;
-use rkyv::{Archive, Archived, Deserialize, Serialize};
 use rkyv_dyn::archive_dyn;
 use rkyv_typename::TypeName;
 use swc_css_ast::Stylesheet;

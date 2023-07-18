@@ -10,7 +10,6 @@ use farmfe_utils::relative;
 use hashbrown::HashSet;
 use heck::AsLowerCamelCase;
 use relative_path::RelativePath;
-use rkyv::{Archive, Archived, Deserialize, Serialize};
 use rkyv_dyn::archive_dyn;
 use rkyv_typename::TypeName;
 use swc_common::DUMMY_SP;

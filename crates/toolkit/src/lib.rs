@@ -5,7 +5,6 @@ pub mod fs;
 pub mod hash;
 pub mod html;
 pub mod resolve;
-pub mod rkyv;
 pub mod script;
 pub mod sourcemap;
 

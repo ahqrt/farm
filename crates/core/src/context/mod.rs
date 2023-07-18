@@ -37,9 +37,9 @@ impl CompilationContext {
       module_group_graph: Box::new(RwLock::new(ModuleGroupGraph::new())),
       resource_pot_map: Box::new(RwLock::new(ResourcePotMap::new())),
       resources_map: Box::new(Mutex::new(HashMap::new())),
+      cache_manager: Box::new(CacheManager::new(&config.root)),
       config: Box::new(config),
       plugin_driver: Box::new(PluginDriver::new(plugins)),
-      cache_manager: Box::new(CacheManager::new()),
       meta: Box::new(ContextMetaData::new()),
       record_manager: Box::new(RecordManager::new()),
     })

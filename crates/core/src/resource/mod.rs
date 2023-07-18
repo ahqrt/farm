@@ -1,5 +1,3 @@
-use rkyv::{Archive, Deserialize, Serialize};
-
 use farmfe_macro_cache_item::cache_item;
 
 use crate::module::ModuleId;
