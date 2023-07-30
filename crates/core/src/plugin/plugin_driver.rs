@@ -309,7 +309,7 @@ impl PluginDriver {
   hook_serial!(update_modules, &mut PluginUpdateModulesHookParams);
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PluginDriverTransformHookResult {
   pub content: String,
   pub source_map_chain: Vec<String>,

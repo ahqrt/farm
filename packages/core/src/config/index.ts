@@ -378,7 +378,8 @@ async function readConfigFile(
         'node_modules',
         '.farm'
       );
-      const fileName = 'farm.config.bundle.mjs';
+      const fileName =
+        path.basename(configFilePath, path.extname(configFilePath)) + '.mjs';
       const normalizedConfig = await normalizeUserCompilationConfig({
         compilation: {
           input: {
@@ -406,7 +407,11 @@ async function readConfigFile(
           sourcemap: false,
           treeShaking: false,
           minify: false,
-          presetEnv: false
+          presetEnv: false,
+          persistentCache: {
+            namespace: 'farm-config--' + fileName.replace(/\./g, '-'),
+            cacheDir: path.join(outputPath, 'cache')
+          }
         },
         server: {
           hmr: false

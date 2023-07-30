@@ -210,15 +210,17 @@ export interface Config {
     lazyCompilation?: boolean;
     treeShaking?: boolean;
     minify?: boolean;
-    presetEnv?:
-      | boolean
-      | {
-          include?: string[];
-          exclude?: string[];
-          // TODO using swc's config
-          options?: any;
-          assumptions?: any;
-        };
+    presetEnv?: boolean | {
+      include?: string[];
+      exclude?: string[];
+      // TODO using swc's config
+      options?: any;
+      assumptions?: any;
+    };
+    persistentCache?: {
+      namespace?: string;
+      cacheDir?: string;
+    };
   };
   jsPlugins?: object[];
   // [rustPluginFilePath, jsonStringifiedOptions]

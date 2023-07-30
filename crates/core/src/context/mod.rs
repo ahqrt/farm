@@ -31,13 +31,26 @@ pub struct CompilationContext {
 
 impl CompilationContext {
   pub fn new(config: Config, plugins: Vec<Arc<dyn Plugin>>) -> Result<Self> {
+    let cache_config = config.persistent_cache.as_ref();
+
+    let (cache_dir, namespace) = if cache_config.enabled() {
+      let cache_config_obj = cache_config.as_obj(&config.root);
+      (cache_config_obj.cache_dir, cache_config_obj.namespace)
+    } else {
+      ("".to_string(), "".to_string())
+    };
+
     Ok(Self {
       watch_graph: Box::new(RwLock::new(WatchGraph::new())),
       module_graph: Box::new(RwLock::new(ModuleGraph::new())),
       module_group_graph: Box::new(RwLock::new(ModuleGroupGraph::new())),
       resource_pot_map: Box::new(RwLock::new(ResourcePotMap::new())),
       resources_map: Box::new(Mutex::new(HashMap::new())),
-      cache_manager: Box::new(CacheManager::new(&config.root)),
+      cache_manager: Box::new(CacheManager::new(
+        &cache_dir,
+        &namespace,
+        config.mode.clone(),
+      )),
       config: Box::new(config),
       plugin_driver: Box::new(PluginDriver::new(plugins)),
       meta: Box::new(ContextMetaData::new()),

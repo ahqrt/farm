@@ -7,16 +7,20 @@ use std::{
 };
 
 use farmfe_core::{
+  cache::module_cache::CachedModule,
   context::CompilationContext,
   error::{CompilationError, Result},
   module::{module_graph::ModuleGraphEdgeDataItem, Module, ModuleId},
   plugin::{
-    constants::PLUGIN_BUILD_STAGE_META_RESOLVE_KIND, PluginAnalyzeDepsHookResultEntry,
-    PluginHookContext, PluginLoadHookParam, PluginParseHookParam, PluginProcessModuleHookParam,
-    PluginResolveHookParam, PluginResolveHookResult, PluginTransformHookParam, ResolveKind,
+    constants::PLUGIN_BUILD_STAGE_META_RESOLVE_KIND,
+    plugin_driver::PluginDriverTransformHookResult, PluginAnalyzeDepsHookResultEntry,
+    PluginHookContext, PluginLoadHookParam, PluginLoadHookResult, PluginParseHookParam,
+    PluginProcessModuleHookParam, PluginResolveHookParam, PluginResolveHookResult,
+    PluginTransformHookParam, ResolveKind,
   },
   rayon,
   rayon::ThreadPool,
+  swc_common::SourceMap,
 };
 
 use farmfe_utils::stringify_query;
@@ -28,6 +32,17 @@ use crate::{
   },
   Compiler,
 };
+
+macro_rules! call_and_catch_error {
+  ($func:ident, $($args:expr),+) => {
+    match $func($($args),+) {
+      Ok(r) => r,
+      Err(e) => {
+        return Err(e);
+      }
+    }
+  };
+}
 
 pub(crate) mod analyze_deps;
 pub(crate) mod finalize_module;
@@ -155,17 +170,6 @@ impl Compiler {
       meta: HashMap::new(),
     };
 
-    macro_rules! call_and_catch_error {
-      ($func:ident, $($args:expr),+) => {
-        match $func($($args),+) {
-          Ok(r) => r,
-          Err(e) => {
-            return Err(e);
-          }
-        }
-      };
-    }
-
     // ================ Load Start ===============
     let load_param = PluginLoadHookParam {
       resolved_path: &resolve_result.resolved_path,
@@ -176,6 +180,64 @@ impl Compiler {
     let load_result = call_and_catch_error!(load, &load_param, context, &hook_context);
     // ================ Load End ===============
 
+    let module_content_hash = farmfe_toolkit::hash::sha256(load_result.content.as_bytes(), 16);
+
+    if context.config.persistent_cache.enabled()
+      && context
+        .cache_manager
+        .module_cache
+        .has_module_cache(&module_content_hash)
+    {
+      let cached_module = context
+        .cache_manager
+        .module_cache
+        .get_module_cache(&module_content_hash);
+      *module = cached_module.module;
+
+      return Ok(cached_module.deps);
+    } else {
+      let source_map = SourceMap {
+        files: todo!(),
+        start_pos: todo!(),
+        file_loader: todo!(),
+        path_mapping: todo!(),
+        doctest_offset: todo!(),
+      };
+      let (deps, transform_result) =
+        Self::build_module_after_load(resolve_result, load_result, module, context, &hook_context)?;
+
+      let placeholder_module = Module::new(module.id.clone());
+      let built_module = std::mem::replace(module, placeholder_module);
+
+      let cached_module = CachedModule {
+        module: built_module,
+        deps,
+        transformed_content: transform_result.content,
+        transformed_module_type: transform_result.module_type,
+      };
+
+      if context.config.persistent_cache.enabled() {
+        context
+          .cache_manager
+          .module_cache
+          .set_module_cache(&module_content_hash, &cached_module);
+      }
+
+      *module = cached_module.module;
+      Ok(cached_module.deps)
+    }
+  }
+
+  fn build_module_after_load(
+    resolve_result: PluginResolveHookResult,
+    load_result: PluginLoadHookResult,
+    module: &mut Module,
+    context: &Arc<CompilationContext>,
+    hook_context: &PluginHookContext,
+  ) -> Result<(
+    Vec<PluginAnalyzeDepsHookResultEntry>,
+    PluginDriverTransformHookResult,
+  )> {
     // ================ Transform Start ===============
     let transform_param = PluginTransformHookParam {
       content: load_result.content,
@@ -186,6 +248,7 @@ impl Compiler {
     };
 
     let transform_result = call_and_catch_error!(transform, transform_param, context);
+    let ret_transform_result = transform_result.clone();
     // ================ Transform End ===============
 
     // ================ Parse Start ===============
@@ -233,7 +296,7 @@ impl Compiler {
     call_and_catch_error!(finalize_module, module, &analyze_deps_result, context);
     // ================ Finalize Module End ===============
 
-    Ok(analyze_deps_result)
+    Ok((analyze_deps_result, ret_transform_result))
   }
 
   /// resolving, loading, transforming and parsing a module in a separate thread
