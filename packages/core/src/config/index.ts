@@ -408,10 +408,7 @@ async function readConfigFile(
           treeShaking: false,
           minify: false,
           presetEnv: false,
-          persistentCache: {
-            namespace: 'farm-config--' + fileName.replace(/\./g, '-'),
-            cacheDir: path.join(outputPath, 'cache')
-          }
+          persistentCache: false
         },
         server: {
           hmr: false

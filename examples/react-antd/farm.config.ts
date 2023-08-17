@@ -19,6 +19,7 @@ export default defineConfig({
       path: './build',
     },
     sourcemap: false,
+    persistentCache: true,
   },
   server: {
     hmr: true,

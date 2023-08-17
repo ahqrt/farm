@@ -12,17 +12,19 @@ use farmfe_core::{
   error::{CompilationError, Result},
   module::{module_graph::ModuleGraphEdgeDataItem, Module, ModuleId},
   plugin::{
-    constants::PLUGIN_BUILD_STAGE_META_RESOLVE_KIND,
-    plugin_driver::PluginDriverTransformHookResult, PluginAnalyzeDepsHookResultEntry,
+    constants::PLUGIN_BUILD_STAGE_META_RESOLVE_KIND, PluginAnalyzeDepsHookResultEntry,
     PluginHookContext, PluginLoadHookParam, PluginLoadHookResult, PluginParseHookParam,
     PluginProcessModuleHookParam, PluginResolveHookParam, PluginResolveHookResult,
     PluginTransformHookParam, ResolveKind,
   },
   rayon,
   rayon::ThreadPool,
-  swc_common::SourceMap,
+  swc_common::Mark,
 };
 
+use farmfe_toolkit::{
+  script::swc_try_with::try_with, swc_ecma_transforms_base::resolver, swc_ecma_visit::VisitMutWith,
+};
 use farmfe_utils::stringify_query;
 
 use crate::{
@@ -181,7 +183,7 @@ impl Compiler {
     // ================ Load End ===============
 
     let module_content_hash = farmfe_toolkit::hash::sha256(load_result.content.as_bytes(), 16);
-
+    // skip building if the module is already built and the cache is enabled
     if context.config.persistent_cache.enabled()
       && context
         .cache_manager
@@ -196,24 +198,15 @@ impl Compiler {
 
       return Ok(cached_module.deps);
     } else {
-      let source_map = SourceMap {
-        files: todo!(),
-        start_pos: todo!(),
-        file_loader: todo!(),
-        path_mapping: todo!(),
-        doctest_offset: todo!(),
-      };
-      let (deps, transform_result) =
+      let deps =
         Self::build_module_after_load(resolve_result, load_result, module, context, &hook_context)?;
-
+      // Replace the module with a placeholder module to prevent the module from being cloned
       let placeholder_module = Module::new(module.id.clone());
       let built_module = std::mem::replace(module, placeholder_module);
 
       let cached_module = CachedModule {
         module: built_module,
         deps,
-        transformed_content: transform_result.content,
-        transformed_module_type: transform_result.module_type,
       };
 
       if context.config.persistent_cache.enabled() {
@@ -234,10 +227,7 @@ impl Compiler {
     module: &mut Module,
     context: &Arc<CompilationContext>,
     hook_context: &PluginHookContext,
-  ) -> Result<(
-    Vec<PluginAnalyzeDepsHookResultEntry>,
-    PluginDriverTransformHookResult,
-  )> {
+  ) -> Result<Vec<PluginAnalyzeDepsHookResultEntry>> {
     // ================ Transform Start ===============
     let transform_param = PluginTransformHookParam {
       content: load_result.content,
@@ -248,7 +238,6 @@ impl Compiler {
     };
 
     let transform_result = call_and_catch_error!(transform, transform_param, context);
-    let ret_transform_result = transform_result.clone();
     // ================ Transform End ===============
 
     // ================ Parse Start ===============
@@ -296,7 +285,7 @@ impl Compiler {
     call_and_catch_error!(finalize_module, module, &analyze_deps_result, context);
     // ================ Finalize Module End ===============
 
-    Ok((analyze_deps_result, ret_transform_result))
+    Ok(analyze_deps_result)
   }
 
   /// resolving, loading, transforming and parsing a module in a separate thread
@@ -348,13 +337,9 @@ impl Compiler {
             Ok(deps) => {
               let module_id = module.id.clone();
               // add module to the graph
-              let status = Self::add_module(module, &resolve_param.kind, &context);
+              Self::add_module(module, &resolve_param.kind, &context);
               // add edge to the graph
               Self::add_edge(&resolve_param, module_id.clone(), order, &context);
-              // if status is false, means the module is handled and is already in the graph, no need to resolve its dependencies again
-              if !status {
-                return;
-              }
 
               // resolving dependencies recursively in the thread pool
               for (order, dep) in deps.into_iter().enumerate() {
@@ -400,12 +385,7 @@ impl Compiler {
   }
 
   /// add a module to the module graph, if the module already exists, update it
-  /// if the module is already in the graph, return false
-  pub(crate) fn add_module(
-    module: Module,
-    kind: &ResolveKind,
-    context: &CompilationContext,
-  ) -> bool {
+  pub(crate) fn add_module(module: Module, kind: &ResolveKind, context: &CompilationContext) {
     let mut module_graph = context.module_graph.write();
 
     // mark entry module
@@ -421,8 +401,6 @@ impl Compiler {
     } else {
       module_graph.add_module(module);
     }
-
-    true
   }
 
   pub(crate) fn create_thread_pool() -> (

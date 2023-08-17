@@ -217,7 +217,7 @@ export interface Config {
       options?: any;
       assumptions?: any;
     };
-    persistentCache?: {
+    persistentCache?: boolean | {
       namespace?: string;
       cacheDir?: string;
     };

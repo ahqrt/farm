@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use farmfe_macro_cache_item::cache_item;
 
 use crate::config::Mode;
-use crate::module::{Module, ModuleType};
+use crate::module::Module;
 use crate::plugin::PluginAnalyzeDepsHookResultEntry;
 use crate::{deserialize, serialize};
 
@@ -16,15 +16,13 @@ pub struct ModuleCacheManager {
 
 #[cache_item]
 pub struct CachedModule {
-  pub transformed_content: String,
-  pub transformed_module_type: Option<ModuleType>,
   pub module: Module,
   pub deps: Vec<PluginAnalyzeDepsHookResultEntry>,
 }
 
 impl ModuleCacheManager {
-  pub fn new(cache_dir: &str, namespace: &str, mode: Mode) -> Self {
-    let mut cache_dir = Path::new(cache_dir).to_path_buf();
+  pub fn new(cache_dir_str: &str, namespace: &str, mode: Mode) -> Self {
+    let mut cache_dir = Path::new(cache_dir_str).to_path_buf();
     cache_dir.push(namespace.to_string() + "-" + FARM_MODULE_CACHE_VERSION);
 
     if matches!(mode, Mode::Development) {
@@ -33,7 +31,7 @@ impl ModuleCacheManager {
       cache_dir.push("production");
     }
 
-    if !cache_dir.exists() {
+    if cache_dir_str.len() > 0 && !cache_dir.exists() {
       std::fs::create_dir_all(&cache_dir).unwrap();
     }
 

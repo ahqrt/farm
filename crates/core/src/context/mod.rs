@@ -15,6 +15,8 @@ use crate::{
   record::RecordManager,
 };
 
+pub(crate) const EMPTY_STR: &str = "";
+
 /// Shared context through the whole compilation.
 pub struct CompilationContext {
   pub config: Box<Config>,
@@ -37,7 +39,7 @@ impl CompilationContext {
       let cache_config_obj = cache_config.as_obj(&config.root);
       (cache_config_obj.cache_dir, cache_config_obj.namespace)
     } else {
-      ("".to_string(), "".to_string())
+      (EMPTY_STR.to_string(), EMPTY_STR.to_string())
     };
 
     Ok(Self {
