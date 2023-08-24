@@ -214,6 +214,7 @@ impl Compiler {
       }
     }
 
+    let size = load_result.content.len();
     // ================ Load End ===============
 
     // ================ Transform Start ===============
@@ -266,6 +267,7 @@ impl Compiler {
       .source_map_chain
       .append(&mut transform_result.source_map_chain);
     module.meta = module_meta;
+    module.size = size;
 
     // ================ Analyze Deps Start ===============
     let analyze_deps_result = call_and_catch_error!(analyze_deps, module, context);
